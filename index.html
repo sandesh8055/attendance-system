@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>SITA Attendance Portal</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+:root {
+    --bg:#f4f6f9; --card:#ffffff; --text:#111827; --muted:#6b7280;
+    --border:#e5e7eb; --primary:#0f2a3d; --accent:#2563eb;
+}
+[data-theme="dark"] {
+    --bg:#0b1220; --card:#111827; --text:#e5e7eb;
+    --muted:#9ca3af; --border:#1f2937; --primary:#020617;
+    --accent:#3b82f6;
+}
+
+* { box-sizing:border-box; }
+
+body {
+    margin:0;
+    font-family:"Segoe UI",Arial,sans-serif;
+    min-height:100vh;
+    background:
+      linear-gradient(rgba(15,42,61,.65), rgba(15,42,61,.65)),
+      url("assets/airport-bg.jpg");
+    background-size:cover;
+    background-position:center;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+}
+
+.app {
+    width:100%;
+    max-width:520px;
+    background:var(--card);
+    border-radius:12px;
+    overflow:hidden;
+    box-shadow:0 20px 45px rgba(0,0,0,.35);
+}
+
+.header {
+    display:flex;
+    align-items:center;
+    gap:12px;
+    padding:16px;
+    border-bottom:1px solid var(--border);
+}
+
+.header img { height:34px; }
+
+.header h1 {
+    margin:0;
+    font-size:17px;
+    color:var(--primary);
+}
+
+.header span {
+    font-size:12px;
+    color:var(--muted);
+}
+
+.toggle {
+    margin-left:auto;
+    background:none;
+    border:none;
+    cursor:pointer;
+    font-size:16px;
+}
+
+.body { padding:22px; }
+
+label {
+    display:block;
+    margin-top:14px;
+    font-size:13px;
+    font-weight:600;
+}
+
+select, input {
+    width:100%;
+    margin-top:6px;
+    padding:10px;
+    font-size:14px;
+    border-radius:6px;
+    border:1px solid var(--border);
+}
+
+.info {
+    margin-top:16px;
+    padding:10px;
+    font-size:12.5px;
+    background:#f9fafb;
+    border-left:4px solid var(--accent);
+}
+
+button {
+    width:100%;
+    margin-top:22px;
+    padding:12px;
+    background:var(--accent);
+    color:#fff;
+    border:none;
+    border-radius:6px;
+    font-size:15px;
+    font-weight:600;
+    cursor:pointer;
+}
+
+#message {
+    margin-top:14px;
+    text-align:center;
+    font-weight:600;
+    font-size:13px;
+}
+
+.footer {
+    text-align:center;
+    font-size:11px;
+    color:var(--muted);
+    padding:10px;
+    border-top:1px solid var(--border);
+}
+</style>
+</head>
+
+<body>
+
+<div class="app">
+    <div class="header">
+        <img src="assets/sita-logo.png" alt="SITA">
+        <div>
+            <h1>Attendance Portal</h1>
+            <span>Mumbai Airport – Operations</span>
+        </div>
+        <button id="themeToggle" class="toggle">🌙</button>
+    </div>
+
+    <div class="body">
+        <form id="attendanceForm">
+
+            <label>Staff Name</label>
+            <select id="name">
+                <option value="">Select</option>
+                <option>Sandesh Duduskar</option>
+                <option>Rahul Thakur</option>
+            </select>
+
+            <label>Terminal</label>
+            <select id="terminal">
+                <option value="">Select</option>
+                <option>T1</option>
+                <option>T2</option>
+                <option>Outside Airport</option>
+            </select>
+
+            <label>Shift</label>
+            <select id="shift">
+                <option value="">Select</option>
+                <option>Day</option>
+                <option>Night</option>
+            </select>
+
+            <label>Date</label>
+            <input type="date" id="date">
+
+            <label>Time</label>
+            <input type="time" id="time">
+
+            <div class="info" id="geoInfo">
+                📍 Getting device location…
+            </div>
+
+            <button type="submit">Submit Attendance</button>
+        </form>
+
+        <div id="message"></div>
+    </div>
+
+    <div class="footer">
+        Pilot Tool • Internal Use Only • SITA
+    </div>
+</div>
+
+<script>
+/* 🔴 PUT YOUR GOOGLE APPS SCRIPT WEB APP URL HERE */
+const scriptURL = "https://script.google.com/macros/s/AKfycbzkpVgjdWZTccMYTAb-Z_I7JGaieClv3e15J_Y7WYY3SJ6541SgqDhW3CE6TBFcM7dGhg/exec";
+
+/* DOM */
+const form = document.getElementById("attendanceForm");
+const nameF = document.getElementById("name");
+const termF = document.getElementById("terminal");
+const shiftF = document.getElementById("shift");
+const dateF = document.getElementById("date");
+const timeF = document.getElementById("time");
+const geo = document.getElementById("geoInfo");
+const msg = document.getElementById("message");
+
+/* Theme */
+const root = document.documentElement;
+const tBtn = document.getElementById("themeToggle");
+const savedTheme = localStorage.getItem("theme");
+if (savedTheme) {
+    root.dataset.theme = savedTheme;
+    tBtn.textContent = savedTheme === "dark" ? "☀️" : "🌙";
+}
+tBtn.onclick = () => {
+    const dark = root.dataset.theme === "dark";
+    root.dataset.theme = dark ? "light" : "dark";
+    localStorage.setItem("theme", root.dataset.theme);
+    tBtn.textContent = dark ? "🌙" : "☀️";
+};
+
+/* Auto date & time */
+const now = new Date();
+dateF.value = now.toISOString().split("T")[0];
+timeF.value =
+    String(now.getHours()).padStart(2,'0') + ":" +
+    String(now.getMinutes()).padStart(2,'0');
+
+/* GPS */
+let gps = "N/A";
+let locationStatus = "Outside Airport";
+let gpsReady = false;
+
+if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+        pos => {
+            gps = pos.coords.latitude.toFixed(5) + "," + pos.coords.longitude.toFixed(5);
+            locationStatus = "GPS Captured";
+            geo.innerText = "📍 " + gps;
+            gpsReady = true;
+        },
+        () => {
+            geo.innerText = "⚠️ Location permission denied";
+        }
+    );
+} else {
+    geo.innerText = "⚠️ GPS not supported on this device";
+}
+
+/* Submit */
+form.addEventListener("submit", e => {
+    e.preventDefault();
+
+    if (!nameF.value || !termF.value || !shiftF.value || !gpsReady) {
+        msg.textContent = "Please wait for location and fill all required fields";
+        msg.style.color = "red";
+        return;
+    }
+
+    fetch(scriptURL, {
+        method: "POST",
+        body: JSON.stringify({
+            name: nameF.value,
+            terminal: termF.value,
+            shift: shiftF.value,
+            date: dateF.value,
+            time: timeF.value,
+            gps,
+            locationStatus
+        })
+    })
+    .then(r => r.json())
+    .then(d => {
+        msg.textContent =
+            d.result === "duplicate"
+            ? "Attendance already marked"
+            : "Attendance recorded successfully";
+
+        msg.style.color =
+            d.result === "duplicate" ? "orange" : "green";
+
+        if (d.result !== "duplicate") {
+            setTimeout(() => {
+                msg.textContent = "";
+                form.reset();
+                gpsReady = false;
+                geo.innerText = "📍 Refreshing location…";
+            }, 2000);
+        }
+    })
+    .catch(() => {
+        msg.textContent = "Error saving attendance";
+        msg.style.color = "red";
+    });
+});
+</script>
+
+</body>
+</html>

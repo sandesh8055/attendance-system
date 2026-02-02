@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>SITA Attendance – Admin</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+:root{
+ --bg:#f4f6f9;--card:#fff;--text:#111827;--muted:#6b7280;
+ --border:#e5e7eb;--accent:#2563eb;
+}
+[data-theme="dark"]{
+ --bg:#0b1220;--card:#111827;--text:#e5e7eb;
+ --muted:#9ca3af;--border:#1f2937;--accent:#3b82f6;
+}
+body{margin:0;font-family:"Segoe UI";background:var(--bg);color:var(--text)}
+.header{
+ background:#0f2a3d;color:#fff;padding:14px;
+ display:flex;align-items:center;gap:10px
+}
+.header img{height:28px}
+.toggle{margin-left:auto;background:none;border:none;color:#fff;cursor:pointer}
+.container{padding:20px}
+.filters{
+ display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px
+}
+.filters input,.filters select,.filters button{
+ padding:8px;font-size:13px
+}
+.filters button{
+ background:var(--accent);color:#fff;border:none;border-radius:4px;
+ cursor:pointer
+}
+table{
+ width:100%;border-collapse:collapse;background:var(--card);
+ box-shadow:0 6px 20px rgba(0,0,0,.1)
+}
+th,td{
+ padding:10px;border-bottom:1px solid var(--border);font-size:13px
+}
+th{background:#f9fafb}
+.badge{padding:4px 8px;border-radius:6px;font-size:11px}
+.in{background:#dcfce7;color:#166534}
+.out{background:#fee2e2;color:#991b1b}
+.footer{
+ text-align:center;font-size:11px;color:var(--muted);
+ margin-top:16px
+}
+</style>
+</head>
+
+<body>
+
+<div class="header">
+ <img src="assets/sita-logo.png">
+ <strong>Attendance Admin Dashboard</strong>
+ <button id="themeToggle" class="toggle">🌙</button>
+</div>
+
+<div class="container">
+
+<div class="filters">
+ <input id="fName" placeholder="Engineer Name">
+ <select id="fShift">
+  <option value="">All Shifts</option>
+  <option>Day</option>
+  <option>Night</option>
+ </select>
+
+ <input type="date" id="fromDate" title="Single Date OR From Date">
+ <input type="date" id="toDate" title="To Date (optional)">
+
+ <button onclick="exportCSV()">⬇ Export to Excel</button>
+</div>
+
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Terminal</th>
+<th>Shift</th>
+<th>Date</th>
+<th>Time</th>
+<th>Location</th>
+<th>Map</th>
+</tr>
+</thead>
+<tbody id="tbody"></tbody>
+</table>
+
+<div class="footer">
+ Pilot Tool • Internal Operations Only
+</div>
+
+</div>
+
+<script>
+/* 🔴 PUT YOUR GOOGLE SHEET ID HERE */
+const SHEET_ID = "1vIrd648BkFkTwgpDcJuMGVxRehvOJLYDhB3LBofY__I";
+const url = `https://opensheet.elk.sh/${SHEET_ID}/Sheet1`;
+
+const tbody = document.getElementById("tbody");
+let allData = [];
+let filteredData = [];
+
+/* Fetch data */
+fetch(url)
+.then(r => r.json())
+.then(d => {
+ allData = d;
+ filteredData = d;
+ renderTable(d);
+});
+
+/* Render table */
+function renderTable(data){
+ tbody.innerHTML = "";
+ data.forEach(r => {
+  const gps = r.GPS || "";
+  const status = r["Location Status"] || "";
+  tbody.innerHTML += `
+   <tr>
+    <td>${r.Name}</td>
+    <td>${r.Terminal}</td>
+    <td>${r.Shift}</td>
+    <td>${r.Date}</td>
+    <td>${r.Time}</td>
+    <td>
+      <span class="badge ${status.includes("Inside") ? "in" : "out"}">
+        ${status}
+      </span>
+    </td>
+    <td>
+      ${gps ? `<a href="https://maps.google.com?q=${gps}" target="_blank">Map</a>` : "-"}
+    </td>
+   </tr>
+  `;
+ });
+}
+
+/* Filters */
+[fName, fShift, fromDate, toDate].forEach(el => el.oninput = applyFilters);
+
+function applyFilters(){
+ const nameVal = fName.value.toLowerCase();
+ const shiftVal = fShift.value;
+ const from = fromDate.value;
+ const to = toDate.value;
+
+ filteredData = allData.filter(r => {
+  const rowDate = r.Date;
+
+  /* No date filter */
+  if (!from && !to) {
+   return (
+    (!nameVal || r.Name.toLowerCase().includes(nameVal)) &&
+    (!shiftVal || r.Shift === shiftVal)
+   );
+  }
+
+  /* Single date (only From selected) */
+  if (from && !to) {
+   return (
+    rowDate === from &&
+    (!nameVal || r.Name.toLowerCase().includes(nameVal)) &&
+    (!shiftVal || r.Shift === shiftVal)
+   );
+  }
+
+  /* Date range */
+  return (
+   rowDate >= from &&
+   rowDate <= to &&
+   (!nameVal || r.Name.toLowerCase().includes(nameVal)) &&
+   (!shiftVal || r.Shift === shiftVal)
+  );
+ });
+
+ renderTable(filteredData);
+}
+
+/* Export CSV */
+function exportCSV(){
+ if(filteredData.length === 0){
+  alert("No data to export");
+  return;
+ }
+
+ let csv = "Name,Terminal,Shift,Date,Time,GPS,Location Status\n";
+ filteredData.forEach(r => {
+  csv += `"${r.Name}","${r.Terminal}","${r.Shift}","${r.Date}","${r.Time}","${r.GPS || ""}","${r["Location Status"] || ""}"\n`;
+ });
+
+ const blob = new Blob([csv], { type: "text/csv" });
+ const link = document.createElement("a");
+ link.href = URL.createObjectURL(blob);
+ link.download = "attendance_report.csv";
+ link.click();
+}
+
+/* Theme toggle */
+const root = document.documentElement;
+const tBtn = themeToggle;
+const saved = localStorage.getItem("theme");
+if(saved){
+ root.dataset.theme = saved;
+ tBtn.textContent = saved === "dark" ? "☀️" : "🌙";
+}
+tBtn.onclick = () => {
+ const dark = root.dataset.theme === "dark";
+ root.dataset.theme = dark ? "light" : "dark";
+ localStorage.setItem("theme", root.dataset.theme);
+ tBtn.textContent = dark ? "🌙" : "☀️";
+};
+</script>
+
+</body>
+</html>
